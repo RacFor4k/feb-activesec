@@ -16,7 +16,7 @@ def main():
         ws = wb.create_sheet('-'.join(file.split('-')[:-1]))
         with open(os.path.join(ROOT_DIR,file), newline='') as f:
             reader = csv.reader(f)
-            rows = [[float(cell) for cell in row] for row in reader] 
+            rows = [[row[0]]+[float(cell) for cell in row[1:]] for row in reader] 
                 
             columns = list(zip(*rows))
             

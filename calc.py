@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Настройки
 MIN_SIZE_BYTES = 512
-READ_BUFFER = 1024 * 1024  # Читаем по 1 МБ за раз для скорости
+READ_BUFFER = 1024 * 1024 # Читаем по 1 МБ за раз для скорости
 
 def calculate_metrics_worker(file_info):
     """
@@ -24,6 +24,8 @@ def calculate_metrics_worker(file_info):
     
     if not file_id_str.isdigit():
         return None
+    
+    file_name = name_stem.split('.')[0]
 
     try:
         # Быстрая проверка размера перед чтением
@@ -70,11 +72,13 @@ def calculate_metrics_worker(file_info):
     else:
         return None
 
+    chi2_norm = chi2 / file_size if file_size > 0 else 0.0
+    
     return {
-        'ID': int(file_id_str),
+        'ID': file_name,
         'SIZE': file_size,
         'ENTROPY': round(entropy, 6),
-        'CHI2': round(chi2, 2)
+        'CHI2': round(chi2_norm, 2)
     }
 
 def process_subfolder(subfolder_path, output_csv_path, max_workers):
