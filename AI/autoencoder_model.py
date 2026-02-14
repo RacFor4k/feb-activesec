@@ -56,4 +56,5 @@ class FileAutoEncoder(nn.Module):
             x = self.head_module(x)
         return x
 
-        
+# class AutoEncoderLoss(nn.Module):
+#     def __init__(self, base_criterion = nn.BCEWithLogitsLoss):
