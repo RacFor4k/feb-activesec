@@ -2,7 +2,7 @@ import os
 import sys
 import tqdm
 
-SIZE_LIMIT = 512 * 1024 #512KB 
+SIZE_LIMIT = 100 * 1024 #512KB 
 
 def cut(path):
     for file in os.listdir(path):
