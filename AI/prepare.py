@@ -25,3 +25,6 @@ def main():
     for type in tqdm.tqdm(types):
         proccess(os.path.join(path, type), type)
     create_config(types)
+
+if __name__ == '__main__':
+    main()

@@ -16,3 +16,6 @@ def main():
     types = os.listdir(path)
     for type in tqdm.tqdm(types):
         cut(os.path.join(path, type))
+
+if __name__ == '__main__':
+    main()
