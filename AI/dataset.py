@@ -4,7 +4,7 @@ import os
 import random
 
 MAX_FILE_LEN = 100 * 1024  # 100KB
-
+FILES_COUNT = 5000
 
 class FileAutoEncoderDataset(Dataset):
     """
@@ -43,7 +43,7 @@ class FileAutoEncoderDataset(Dataset):
             raise Exception('No valid data types found in dataset')
         
         # Количество файлов на тип
-        self.type_len = int(6000 * data_percent)
+        self.type_len = int(FILES_COUNT * data_percent)
         self.data_len = self.type_len * len(self.types)
 
     def __len__(self):
@@ -58,17 +58,15 @@ class FileAutoEncoderDataset(Dataset):
         type_path = os.path.join(self.dataset_path, type_name)
         
         # Получаем список файлов с данными (префикс '0' = оригинальные данные)
-        data_files = [f for f in os.listdir(type_path) if f.startswith('0') and f.endswith('.bin')]
-        
-        if not data_files:
-            # Если нет .bin файлов, пробуем все файлы с '0'
-            data_files = [f for f in os.listdir(type_path) if f.startswith('0')]
+        if self.is_train:
+            data_files = [f for f in os.listdir(type_path)[-self.type_len:FILES_COUNT] if f.startswith('0')]
+        data_files = [f for f in os.listdir(type_path)[:self.type_len] if f.startswith('0')]
         
         if not data_files:
             raise FileNotFoundError(f'No data files found in {type_path}')
         
         # Выбираем файл (циклически если индекс больше количества файлов)
-        file_name = data_files[file_idx % len(data_files)]
+        file_name = data_files[file_idx]
         file_path = os.path.join(type_path, file_name)
         
         # Читаем данные
