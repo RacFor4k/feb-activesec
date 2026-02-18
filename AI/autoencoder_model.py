@@ -10,11 +10,11 @@ Encoder/Decoder - массив: [фильтры, ядро, смещение]
 
 
 class FileAutoEncoder(nn.Module):
-    def __init__(self, emb_dim, encoder_layers, decoder_chanels, head_module=None, latent_module=None, is_gelu=False):
+    def __init__(self, emb_dim, encoder_layers, decoder_layers, head_module=None, latent_module=None, is_gelu=False):
+        super().__init__()
         self.emb_dim = emb_dim
         self.encoder_layers = encoder_layers
-        self.decoder_layers = list(reversed(encoder_layers))
-        self.decoder_chanels = decoder_chanels
+        self.decoder_layers = decoder_layers
         self.head_module = head_module
         self.latent_module = latent_module
         self.activation = nn.GELU() if is_gelu else nn.ReLU()
@@ -25,42 +25,56 @@ class FileAutoEncoder(nn.Module):
 
     def _createEncoder(self):
         self.encoder = nn.ModuleList()
-        self.encoder.append(nn.Sequential(
-            nn.Conv1d(self.emb_dim, self.encoder_layers[0][0], self.encoder_layers[0][1], self.encoder_layers[0][2]),
-            nn.BatchNorm1d(self.encoder_layers[0][0])))
-        for i, layer_data in enumerate(self.encoder_layers[1:], 1):
+        for layer_data in self.encoder_layers:
+            in_ch, out_ch, kernel, stride = layer_data
+            padding = (kernel - 1) // 2 if stride == 1 else 0
             self.encoder.append(nn.Sequential(
-                nn.Conv1d(self.encoder_layers[i-1][0], layer_data[0], layer_data[1], layer_data[2]),
-                nn.BatchNorm1d(layer_data[0])))
+                nn.Conv1d(in_ch, out_ch, kernel, stride, padding=padding),
+                nn.BatchNorm1d(out_ch)))
 
     def _createDecoder(self):
         self.decoder = nn.ModuleList()
         for i, layer_data in enumerate(self.decoder_layers):
+            in_ch, out_ch, kernel, stride = layer_data
+            # Для симметрии с encoder: padding только при stride=1
+            padding = (kernel - 1) // 2 if stride == 1 else 0
+            # output_padding для первого слоя со stride=2 для восстановления размера
+            output_padding = 1 if stride == 2 and i == 0 else 0
             self.decoder.append(nn.Sequential(
-                nn.ConvTranspose1d(layer_data[0], self.decoder_chanels[i], layer_data[1], layer_data[2]),
-                nn.BatchNorm1d(self.decoder_chanels[i])))
+                nn.ConvTranspose1d(in_ch, out_ch, kernel, stride, 
+                                   padding=padding, output_padding=output_padding),
+                nn.BatchNorm1d(out_ch)))
 
     def forward(self, x):
+        print(x.shape)
         x = self.embedding(x)  # (batch, seq_len, emb_dim)
+        print(x.shape)
         x = x.transpose(1, 2)  # (batch, emb_dim, seq_len) for Conv1d
+        print(x.shape)
         
         skip_connections = []
         for conv in self.encoder:
             x = conv(x)
+            print(x.shape)
             skip_connections.append(x)
         
         if self.latent_module:
             x = self.latent_module(x)
+            print(x.shape)
         
         for i, conv_transpose in enumerate(self.decoder):
             if i < len(skip_connections):
                 x = torch.cat([x, skip_connections[-(i+1)]], dim=1)
+                print(x.shape)
             x = conv_transpose(x)
+            print(x.shape)
         
         if self.head_module:
             x = self.head_module(x)
+            print(x.shape)
         else:
             x = x.transpose(1, 2)  # (batch, seq_len, emb_dim)
+            print(x.shape)
 
         return x
 

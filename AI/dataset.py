@@ -78,7 +78,7 @@ class FileAutoEncoderDataset(Dataset):
             data = data + b'\x00' * (self.file_len - len(data))
         else:
             data = data[:self.file_len]
-        
+
         # Преобразуем в тензор
         target = torch.tensor(list(data), dtype=torch.long)  # (file_len,)
         
