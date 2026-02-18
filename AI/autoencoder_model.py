@@ -92,7 +92,7 @@ class ByteLogitsHead(nn.Module):
 class AutoEncoderLoss(nn.Module):
     """
     Masked loss function for file recovery autoencoder.
-    
+
     Uses CrossEntropyLoss for byte classification (0-255).
     Prioritizes accuracy on masked (damaged) positions.
 
@@ -113,42 +113,43 @@ class AutoEncoderLoss(nn.Module):
         self.alpha = alpha  # Weight for masked (damaged) areas
         self.beta = beta    # Weight for unmasked (intact) areas
 
-    def forward(self, output, target, mask=None):
+    def forward(self, output, target, mask=None, return_metrics=False):
         """
         Args:
             output: Model predictions (batch, seq_len, 256) - logits for each byte value
             target: Original byte values (batch, seq_len) with values 0-255
             mask: Binary mask (batch, seq_len) where 1 = damaged position
-        
+            return_metrics: If True, return dict with loss and metrics
+
         Returns:
-            Weighted loss scalar
+            Weighted loss scalar, or dict with metrics if return_metrics=True
         """
         # Ensure correct shapes
         if output.dim() == 3:
             # (batch, seq_len, 256) -> (batch, 256, seq_len) for CrossEntropy
             output = output.transpose(1, 2)
-        
+
         if target.dim() == 2:
             # (batch, seq_len)
             pass
         else:
             target = target.squeeze(-1)
-        
+
         # Create mask if not provided
         if mask is None:
             mask = torch.zeros_like(target, dtype=torch.float32)
-        
+
         # Compute per-position loss (batch, seq_len)
         per_position_loss = self.base_criterion(output, target)
-        
+
         # Split loss into masked and unmasked components
         masked_loss = per_position_loss * mask
         unmasked_loss = per_position_loss * (1 - mask)
-        
+
         # Sum losses with weights
         masked_sum = masked_loss.sum()
         unmasked_sum = unmasked_loss.sum()
-        
+
         # Normalize by number of elements in each region
         num_masked = mask.sum().clamp(min=1)
         num_unmasked = (1 - mask).sum().clamp(min=1)
@@ -156,4 +157,66 @@ class AutoEncoderLoss(nn.Module):
         # Weighted average loss
         loss = (self.alpha * masked_sum / num_masked) + (self.beta * unmasked_sum / num_unmasked)
 
-        return loss
+        if not return_metrics:
+            return loss
+
+        # Compute predictions for metrics
+        output_transposed = output.transpose(1, 2)  # (batch, seq_len, 256)
+        pred_bytes = output_transposed.argmax(dim=-1)
+
+        # Binary classification: correct prediction (1) vs incorrect (0)
+        correct = (pred_bytes == target).float()
+
+        # Masked positions metrics
+        masked_correct = correct * mask
+        masked_tp = masked_correct.sum()  # True Positives: correctly predicted masked bytes
+        masked_fp = (1 - masked_correct) * mask  # False Positives: incorrectly predicted masked bytes
+        masked_fp = masked_fp.sum()
+        masked_tn = torch.tensor(0.0, device=loss.device)  # No TN for masked (all are positive class)
+        masked_fn = torch.tensor(0.0, device=loss.device)  # No FN for masked (all are positive class)
+
+        # Unmasked positions metrics
+        unmasked_correct = correct * (1 - mask)
+        unmasked_tn = unmasked_correct.sum()  # True Negatives: correctly predicted unmasked bytes
+        unmasked_fp = torch.tensor(0.0, device=loss.device)  # No FP for unmasked (all are negative class)
+        unmasked_fn = (1 - unmasked_correct) * (1 - mask)  # False Negatives: incorrectly predicted unmasked bytes
+        unmasked_fn = unmasked_fn.sum()
+        unmasked_tp = torch.tensor(0.0, device=loss.device)  # No TP for unmasked (all are negative class)
+
+        # Total metrics
+        total_tp = masked_tp + unmasked_tp
+        total_fp = masked_fp + unmasked_fp
+        total_tn = masked_tn + unmasked_tn
+        total_fn = masked_fn + unmasked_fn
+
+        # Accuracy metrics
+        masked_acc = (masked_tp / num_masked).item() if num_masked > 0 else 0.0
+        unmasked_acc = (unmasked_tn / num_unmasked).item() if num_unmasked > 0 else 0.0
+
+        # Precision, Recall, F1 for masked positions
+        precision = (masked_tp / (masked_tp + masked_fp)).item() if (masked_tp + masked_fp) > 0 else 0.0
+        recall = masked_acc  # For masked positions, recall = accuracy
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
+        return {
+            'loss': loss.item(),
+            'masked_loss': (self.alpha * masked_sum / num_masked).item(),
+            'unmasked_loss': (self.beta * unmasked_sum / num_unmasked).item(),
+            'masked_acc': masked_acc,
+            'unmasked_acc': unmasked_acc,
+            'masked_tp': masked_tp.item(),
+            'masked_fp': masked_fp.item(),
+            'masked_tn': masked_tn.item(),
+            'masked_fn': masked_fn.item(),
+            'unmasked_tp': unmasked_tp.item(),
+            'unmasked_fp': unmasked_fp.item(),
+            'unmasked_tn': unmasked_tn.item(),
+            'unmasked_fn': unmasked_fn.item(),
+            'total_tp': total_tp.item(),
+            'total_fp': total_fp.item(),
+            'total_tn': total_tn.item(),
+            'total_fn': total_fn.item(),
+            'precision': precision,
+            'recall': recall,
+            'f1': f1,
+        }

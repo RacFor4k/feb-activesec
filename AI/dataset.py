@@ -4,7 +4,7 @@ import os
 import random
 
 MAX_FILE_LEN = 100 * 1024  # 100KB
-FILES_COUNT = 100
+FILES_COUNT = 5000
 
 class FileAutoEncoderDataset(Dataset):
     """
@@ -16,7 +16,7 @@ class FileAutoEncoderDataset(Dataset):
     - mask: бинарная маска (1=повреждено), shape: (file_len,)
     """
     
-    def __init__(self, file_len=1024, file_dropout=0.1, data_percent=0.9, is_train=True, multiplier=1):
+    def __init__(self, file_len=10240, file_dropout=0.1, data_percent=0.9, is_train=True, multiplier=1):
         if multiplier > MAX_FILE_LEN // file_len:
             raise Exception('Too much multiplier')
         
@@ -59,16 +59,15 @@ class FileAutoEncoderDataset(Dataset):
         
         # Получаем список файлов с данными (префикс '0' = оригинальные данные)
         if self.is_train:
-            data_files = [f for f in os.listdir(type_path)[-self.type_len:FILES_COUNT] if f.startswith('0')]
-        data_files = [f for f in os.listdir(type_path)[:self.type_len] if f.startswith('0')]
-        
+            data_files = [f for f in os.listdir(type_path)[:self.type_len] if f.startswith('0')]
+        else:
+            data_files = [f for f in os.listdir(type_path)[:FILES_COUNT][-self.type_len:] if f.startswith('0')]
         if not data_files:
             raise FileNotFoundError(f'No data files found in {type_path}')
         
         # Выбираем файл (циклически если индекс больше количества файлов)
         file_name = data_files[file_idx]
         file_path = os.path.join(type_path, file_name)
-        
         # Читаем данные
         with open(file_path, 'rb') as f:
             data = f.read()

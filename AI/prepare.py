@@ -40,7 +40,8 @@ def process(path, type):
         src_path = os.path.join(path, file)
         dst_path_0 = os.path.join(prepared_type_dir, f'0{i:04d}')
         dst_path_1 = os.path.join(prepared_type_dir, f'1{i:04d}')
-
+        if os.path.exists(dst_path_0):
+            continue
         with open(src_path, 'rb') as reader:
             data = reader.read(PACKET_SIZE)
 
