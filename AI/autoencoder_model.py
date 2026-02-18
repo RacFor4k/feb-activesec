@@ -25,57 +25,40 @@ class FileAutoEncoder(nn.Module):
 
     def _createEncoder(self):
         self.encoder = nn.ModuleList()
-        for layer_data in self.encoder_layers:
-            in_ch, out_ch, kernel, stride = layer_data
-            padding = (kernel - 1) // 2 if stride == 1 else 0
+        for in_ch, out_ch, kernel, stride, pad in self.encoder_layers:
             self.encoder.append(nn.Sequential(
-                nn.Conv1d(in_ch, out_ch, kernel, stride, padding=padding),
+                nn.Conv1d(in_ch, out_ch, kernel, stride, pad),
                 nn.BatchNorm1d(out_ch)))
 
     def _createDecoder(self):
         self.decoder = nn.ModuleList()
-        for i, layer_data in enumerate(self.decoder_layers):
-            in_ch, out_ch, kernel, stride = layer_data
-            # Для симметрии с encoder: padding только при stride=1
-            padding = (kernel - 1) // 2 if stride == 1 else 0
-            # output_padding для первого слоя со stride=2 для восстановления размера
-            output_padding = 1 if stride == 2 and i == 0 else 0
+        for in_ch, out_ch, kernel, stride, pad, out_pad in self.decoder_layers:
             self.decoder.append(nn.Sequential(
-                nn.ConvTranspose1d(in_ch, out_ch, kernel, stride, 
-                                   padding=padding, output_padding=output_padding),
+                nn.ConvTranspose1d(in_ch, out_ch, kernel, stride, pad, out_pad),
                 nn.BatchNorm1d(out_ch)))
 
     def forward(self, x):
-        print(x.shape)
         x = self.embedding(x)  # (batch, seq_len, emb_dim)
-        print(x.shape)
         x = x.transpose(1, 2)  # (batch, emb_dim, seq_len) for Conv1d
-        print(x.shape)
         
         skip_connections = []
         for conv in self.encoder:
             x = conv(x)
-            print(x.shape)
             skip_connections.append(x)
         
         if self.latent_module:
             x = self.latent_module(x)
-            print(x.shape)
         
         for i, conv_transpose in enumerate(self.decoder):
             if i < len(skip_connections):
                 x = torch.cat([x, skip_connections[-(i+1)]], dim=1)
-                print(x.shape)
             x = conv_transpose(x)
-            print(x.shape)
         
         if self.head_module:
             x = self.head_module(x)
-            print(x.shape)
         else:
             x = x.transpose(1, 2)  # (batch, seq_len, emb_dim)
-            print(x.shape)
-
+            
         return x
 
 
