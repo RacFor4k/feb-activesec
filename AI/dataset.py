@@ -19,7 +19,7 @@ class FileAutoEncoderDataset(Dataset):
     def __init__(self, file_len=10240, file_dropout=0.1, data_percent=0.9, is_train=True, multiplier=1):
         if multiplier > MAX_FILE_LEN // file_len:
             raise Exception('Too much multiplier')
-        
+        self.multiplier = multiplier
         self.file_len = file_len
         self.file_dropout = file_dropout
         self.is_train = is_train
@@ -43,7 +43,7 @@ class FileAutoEncoderDataset(Dataset):
             raise Exception('No valid data types found in dataset')
         
         # Количество файлов на тип
-        self.type_len = int(FILES_COUNT * data_percent)
+        self.type_len = int(FILES_COUNT * data_percent)*multiplier
         self.data_len = self.type_len * len(self.types)
 
     def __len__(self):
@@ -53,7 +53,8 @@ class FileAutoEncoderDataset(Dataset):
         # Определяем тип и индекс файла
         type_idx = index // self.type_len
         file_idx = index % self.type_len
-        
+        chunk_idx = file_idx&self.multiplier
+
         type_name = self.types[type_idx]
         type_path = os.path.join(self.dataset_path, type_name)
         
@@ -70,13 +71,12 @@ class FileAutoEncoderDataset(Dataset):
         file_path = os.path.join(type_path, file_name)
         # Читаем данные
         with open(file_path, 'rb') as f:
-            data = f.read()
+            f.seek(self.file_len*chunk_idx)
+            data = f.read(self.file_len)
         
-        # Обрезаем или дополняем до нужной длины
+        # Дополняем до нужной длины
         if len(data) < self.file_len:
             data = data + b'\x00' * (self.file_len - len(data))
-        else:
-            data = data[:self.file_len]
 
         # Преобразуем в тензор
         target = torch.tensor(list(data), dtype=torch.long)  # (file_len,)

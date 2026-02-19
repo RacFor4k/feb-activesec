@@ -201,20 +201,21 @@ def load_model_from_checkpoint(checkpoint, model, optimizer=None, device=None):
     return model, optimizer
 
 def main():
-    train_dataset = FileAutoEncoderDataset(data_percent=0.9)
-    test_dataset = FileAutoEncoderDataset(data_percent=0.1,is_train=False)
+    train_dataset = FileAutoEncoderDataset(file_len=4096,data_percent=0.9, file_dropout=0.001)
+    test_dataset = FileAutoEncoderDataset(file_len=1024, data_percent=0.1,is_train=False, file_dropout=0.001)
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=64,
+        batch_size=128,
         shuffle=True,
         num_workers=4
     )
 
     test_loader = DataLoader(
         test_dataset,
-        batch_size=32,
-        shuffle=False
+        batch_size=128,
+        shuffle=False,
+        num_workers=4
     )
 
     model = FileAutoEncoder(
@@ -224,9 +225,13 @@ def main():
             [32, 64, 5, 1, 2],
             [64, 128, 3, 1, 1],
             [128, 256, 3, 2, 1],
+            [256, 512, 3, 2, 1],
+            [512, 512, 3, 2, 1],
         ],
         [
-            [512, 128, 3, 2, 1, 1],  # kernel=4 для компенсации: (5119-1)*2 + 4 = 10240
+            [1024, 512, 3, 2, 1, 1],  # kernel=4 для компенсации: (5119-1)*2 + 4 = 10240
+            [1024, 256, 3, 2, 1, 1], 
+            [512, 128, 3, 2, 1, 1], 
             [256, 64, 3, 1, 1, 0],
             [128, 32, 5, 1, 2, 0],
             [64, 16, 11, 1, 5, 0]
@@ -235,8 +240,8 @@ def main():
         is_gelu=True
     ).to(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
-    criterion = AutoEncoderLoss(alpha=10,beta=0.5)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    criterion = AutoEncoderLoss(alpha=1,beta=0.1)
 
     best_test_loss = float('inf')
 
