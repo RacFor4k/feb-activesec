@@ -240,8 +240,8 @@ def main():
             [64, 32, 5, 2, 2, 1],
             [32, 16, 11, 1, 5, 0]
         ],
-        # ByteLogitsHead(16),
-        latent_module=IsCryptH(16384),
+        ByteLogitsHead(16),
+        #latent_module=IsCryptH(16384),
         is_gelu=True,
         dropout=0.01
     ).to(device)

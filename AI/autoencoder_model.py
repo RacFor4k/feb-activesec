@@ -56,25 +56,25 @@ class FileAutoEncoder(nn.Module):
         # skip_connections = []
         for conv in self.encoder:
             x = conv(x)
-            self.activation(x)
+            x = self.activation(x)
             p(x.shape)
             # skip_connections.append(x)
         
         if self.latent_module:
             x = self.latent_module(x)
         
-        # for i, conv_transpose in enumerate(self.decoder):
-        #     # if i < len(skip_connections):
-        #         # x = torch.cat([x, skip_connections[-(i+1)]], dim=1)
-        #     self.activation(x)
-        #     x = conv_transpose(x)
-        #     p(x.shape)
+        for i, conv_transpose in enumerate(self.decoder):
+            # if i < len(skip_connections):
+                # x = torch.cat([x, skip_connections[-(i+1)]], dim=1)
+            x = conv_transpose(x)
+            x = self.activation(x)
+            p(x.shape)
         
-        # if self.head_module:
-        #     x = self.head_module(x)
-        #     p(x.shape)
-        # else:
-        #     x = x.transpose(1, 2)  # (batch, seq_len, emb_dim)
+        if self.head_module:
+            x = self.head_module(x)
+            p(x.shape)
+        else:
+            x = x.transpose(1, 2)  # (batch, seq_len, emb_dim)
             
         return x
 
