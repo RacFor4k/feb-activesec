@@ -1,4 +1,4 @@
-from autoencoder_model import FileBinaryClassifierFC
+from autoencoder_model import FileBinaryClassifierFC, FileBinaryClassifierTransformer
 from dataset import BinaryClassificationDataset
 
 import torch
@@ -245,7 +245,7 @@ def main():
     )
 
     # Модель: CNN Encoder + MLP Classifier
-    model = FileBinaryClassifierFC(
+    model = FileBinaryClassifierTransformer(
         emb_dim=16,
         encoder_layers=[
             [16, 32, 11, 1, 5],
@@ -258,7 +258,7 @@ def main():
         ],
         is_gelu=True,
         dropout=0.15,
-        fc_hidden=128
+        # fc_hidden=128
     ).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)

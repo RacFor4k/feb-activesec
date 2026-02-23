@@ -382,7 +382,7 @@ class FileBinaryClassifierTransformer(nn.Module):
             dim_feedforward=transformer_ff,
             dropout=dropout,
             activation='gelu' if is_gelu else 'relu',
-            batch_first=False
+            batch_first=True
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=transformer_layers)
 
@@ -422,13 +422,11 @@ class FileBinaryClassifierTransformer(nn.Module):
             x = self.activation(x)
         # x: (batch, channels, seq_len)
 
-        # Transformer expects (seq_len, batch, channels)
-        x = x.permute(2, 0, 1)  # (seq_len, batch, channels)
-
+        x = x.transpose(1, 2)  # (batch, emb_dim, seq_len)
         x = self.transformer(x)  # (seq_len, batch, channels)
 
         # Global Average Pooling
-        x = x.mean(dim=0)  # (batch, channels)
+        x = x.mean(dim=1)  # (batch, channels)
 
         # Classifier
         logits = self.classifier(x)  # (batch, 2)

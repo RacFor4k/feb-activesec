@@ -247,7 +247,7 @@ def main():
     ).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    criterion = torch.nn.CrossEntropyLoss()
+    criterion = AutoEncoderLoss(alpha=0,beta=1)
 
     if len(sys.argv) > 1:
         load_model_from_checkpoint(load_checkpoint(sys.argv[1]),model,optimizer,device)
