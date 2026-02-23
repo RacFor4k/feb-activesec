@@ -203,8 +203,8 @@ def load_model_from_checkpoint(checkpoint, model, optimizer=None, device=None):
     return model, optimizer, checkpoint['epoch']
 
 def main():
-    train_dataset = FileAutoEncoderDataset(file_len=4096,data_percent=0.9, file_dropout=0.0)
-    test_dataset = FileAutoEncoderDataset(file_len=4096, data_percent=0.1, is_train=False, file_dropout=0.0)
+    train_dataset = FileAutoEncoderDataset(file_len=4096,data_percent=0.9, file_dropout=0.01)
+    test_dataset = FileAutoEncoderDataset(file_len=4096, data_percent=0.1, is_train=False, file_dropout=0.01)
 
     train_loader = DataLoader(
         train_dataset,
@@ -225,29 +225,29 @@ def main():
         [
             [16, 32, 11, 1, 5],
             [32, 64, 5, 2, 2],
-            [64, 128, 3, 2, 1],
-            [128, 256, 3, 2, 1],
+            [64, 128, 3, 1, 1],
+            [128, 256, 3, 1, 1],
             [256, 256, 3, 2, 1],
             [256, 256, 3, 2, 1],
             [256, 256, 3, 2, 1],
         ],
         [
-            [256, 256, 3, 2, 1, 1],
-            [256, 256, 3, 2, 1, 1], 
-            [256, 256, 3, 2, 1, 1], 
-            [256, 128, 3, 2, 1, 1], 
-            [128, 64, 3, 2, 1, 1],
-            [64, 32, 5, 2, 2, 1],
-            [32, 16, 11, 1, 5, 0]
+            [512, 256, 3, 2, 1, 1],
+            [512, 256, 3, 2, 1, 1], 
+            [512, 256, 3, 2, 1, 1], 
+            [512, 128, 3, 1, 1, 0], 
+            [256, 64, 3, 1, 1, 0],
+            [128, 32, 5, 2, 2, 1],
+            [64, 16, 11, 1, 5, 0]
         ],
         ByteLogitsHead(16),
         #latent_module=IsCryptH(16384),
         is_gelu=True,
-        dropout=0.01
+        dropout=0
     ).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    criterion = AutoEncoderLoss(alpha=0,beta=1)
+    criterion = AutoEncoderLoss(alpha=0.9,beta=0.1)
 
     if len(sys.argv) > 1:
         load_model_from_checkpoint(load_checkpoint(sys.argv[1]),model,optimizer,device)

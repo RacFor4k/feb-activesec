@@ -53,19 +53,19 @@ class FileAutoEncoder(nn.Module):
         x = x.transpose(1, 2)  # (batch, emb_dim, seq_len) for Conv1d
         p(x.shape)
         
-        # skip_connections = []
+        skip_connections = []
         for conv in self.encoder:
             x = conv(x)
             x = self.activation(x)
             p(x.shape)
-            # skip_connections.append(x)
+            skip_connections.append(x)
         
         if self.latent_module:
             x = self.latent_module(x)
         
         for i, conv_transpose in enumerate(self.decoder):
-            # if i < len(skip_connections):
-                # x = torch.cat([x, skip_connections[-(i+1)]], dim=1)
+            if i < len(skip_connections):
+                x = torch.cat([x, skip_connections[-(i+1)]], dim=1)
             x = conv_transpose(x)
             x = self.activation(x)
             p(x.shape)

@@ -248,8 +248,8 @@ def main():
     model = FileBinaryClassifierFC(
         emb_dim=16,
         encoder_layers=[
-            [16, 32, 11, 4, 5],
-            [32, 64, 5, 4, 2],
+            [16, 16, 1, 1, 0],
+            # [32, 64, 5, 4, 2],
         ],
         is_gelu=True,
         dropout=0.15,

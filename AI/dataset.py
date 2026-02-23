@@ -5,7 +5,7 @@ import random
 from operator import itemgetter
 
 MAX_FILE_LEN = 100 * 1024  # 100KB
-FILES_COUNT = 10000
+FILES_COUNT = 5000
 
 
 class BinaryClassificationDataset(Dataset):
