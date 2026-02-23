@@ -245,20 +245,15 @@ def main():
     )
 
     # Модель: CNN Encoder + MLP Classifier
-    model = FileBinaryClassifierTransformer(
+    model = FileBinaryClassifierFC(
         emb_dim=16,
         encoder_layers=[
-            [16, 32, 11, 1, 5],
-            [32, 64, 5, 2, 2],
-            [64, 128, 3, 2, 1],
-            [128, 256, 3, 2, 1],
-            [256, 256, 3, 2, 1],
-            [256, 256, 3, 2, 1],
-            [256, 256, 3, 2, 1],
+            [16, 32, 11, 4, 5],
+            [32, 64, 5, 4, 2],
         ],
         is_gelu=True,
         dropout=0.15,
-        # fc_hidden=128
+        fc_hidden=128
     ).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
