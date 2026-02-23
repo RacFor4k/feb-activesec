@@ -2,9 +2,112 @@ import torch
 from torch.utils.data import Dataset
 import os
 import random
+from operator import itemgetter
 
 MAX_FILE_LEN = 100 * 1024  # 100KB
-FILES_COUNT = 5000
+FILES_COUNT = 10000
+
+
+class BinaryClassificationDataset(Dataset):
+    """
+    Dataset для бинарной классификации: зашифрован файл или нет.
+
+    Возвращает 2 тензора:
+    - input: данные файла (байты 0-255), shape: (file_len,)
+    - label: метка класса (0=не зашифрован, 1=зашифрован), shape: ()
+    """
+
+    def __init__(self, file_len=10240, data_percent=0.9, is_train=True, offset=0, rand_offset=0):
+        """
+        Args:
+            file_len: длина вырезки из файла в байтах
+            data_percent: доля данных от общего количества файлов
+            is_train: режим обучения (True) или валидации (False)
+            offset: глобальное смещение от начала файла
+            rand_offset: максимальное случайное смещение, добавляемое к offset
+        """
+        self.file_len = file_len
+        self.is_train = is_train
+        self.offset = offset
+        self.rand_offset = rand_offset
+        self.dataset_path = os.path.join('AI', 'prepared')
+
+        if not os.path.exists(self.dataset_path):
+            raise Exception('Dataset not found')
+
+        # Загружаем игнорируемые типы
+        with open(os.path.join(self.dataset_path, 'train.ignore'), 'r') as ignr:
+            self.ignored_types = [line.strip() for line in ignr.readlines() if line.strip() and line[0] != '#']
+
+        # Получаем список типов (папок)
+        self.types = []
+        for type_name in os.listdir(self.dataset_path):
+            type_path = os.path.join(self.dataset_path, type_name)
+            if os.path.isdir(type_path) and type_name not in self.ignored_types:
+                self.types.append(type_name)
+
+        if not self.types:
+            raise Exception('No valid data types found in dataset')
+
+        # Количество файлов на тип
+        self.type_len = int(FILES_COUNT * data_percent)
+        self.data_len = self.type_len * len(self.types)
+
+        # Равномерное разделение: чётные индексы - train, нечётные - test
+        rand = random.Random(0)
+        self.data_indices = list(range(0,FILES_COUNT))
+        rand.shuffle(self.data_indices)
+
+    def __len__(self):
+        return self.data_len
+
+    def __getitem__(self, index):
+        # Определяем тип и индекс файла
+        type_idx = index // self.type_len
+        file_idx = index % self.type_len
+
+        type_name = self.types[type_idx]
+        type_path = os.path.join(self.dataset_path, type_name)
+
+        # Получаем список файлов
+        all_files = [f for f in os.listdir(type_path)]
+
+        # Равномерная выборка без пересечений
+        if self.is_train:
+            data_files = list(itemgetter(*self.data_indices[:self.type_len])(all_files))
+        else:
+            data_files = list(itemgetter(*self.data_indices[-self.type_len:])(all_files))
+
+        if not data_files:
+            raise FileNotFoundError(f'No files found in {type_path}')
+
+        # Выбираем файл (циклически если индекс больше количества файлов)
+        file_name = data_files[file_idx % len(data_files)]
+        file_path = os.path.join(type_path, file_name)
+
+        # Определяем метку: 1=зашифрован (префикс '1'), 0=не зашифрован (префикс '0')
+        label = 1 if file_name.startswith('1') else 0
+
+        # Вычисляем смещение
+        current_offset = self.offset
+        if self.rand_offset > 0:
+            current_offset += random.randint(0, self.rand_offset)
+
+        # Читаем данные
+        with open(file_path, 'rb') as f:
+            f.seek(current_offset)
+            data = f.read(self.file_len)
+
+        # Дополняем до нужной длины
+        if len(data) < self.file_len:
+            data = data + b'\x00' * (self.file_len - len(data))
+
+        # Преобразуем в тензоры
+        input_data = torch.tensor(list(data), dtype=torch.long)  # (file_len,)
+        label_tensor = torch.tensor(label, dtype=torch.long)  # ()
+
+        return input_data, label_tensor
+
 
 class FileAutoEncoderDataset(Dataset):
     """

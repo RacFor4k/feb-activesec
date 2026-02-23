@@ -1,4 +1,4 @@
-from autoencoder_model import FileAutoEncoder, ByteLogitsHead, AutoEncoderLoss
+from autoencoder_model import FileAutoEncoder, ByteLogitsHead, AutoEncoderLoss, FCLatent, IsCryptH
 from dataset import FileAutoEncoderDataset
 
 import torch
@@ -6,9 +6,11 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import os
+import pandas
+import sys
+import msvcrt
 
-
-NUM_EPOCHES = 200
+NUM_EPOCHES = 50
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def test_model(model, criterion, loader):
@@ -198,54 +200,76 @@ def load_model_from_checkpoint(checkpoint, model, optimizer=None, device=None):
     if optimizer is not None and 'optimizer_state_dict' in checkpoint:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     
-    return model, optimizer
+    return model, optimizer, checkpoint['epoch']
 
 def main():
-    train_dataset = FileAutoEncoderDataset(file_len=4096,data_percent=0.9, file_dropout=0.001)
-    test_dataset = FileAutoEncoderDataset(file_len=1024, data_percent=0.1,is_train=False, file_dropout=0.001)
+    train_dataset = FileAutoEncoderDataset(file_len=4096,data_percent=0.9, file_dropout=0.0)
+    test_dataset = FileAutoEncoderDataset(file_len=4096, data_percent=0.1, is_train=False, file_dropout=0.0)
 
     train_loader = DataLoader(
         train_dataset,
         batch_size=128,
         shuffle=True,
-        num_workers=4
+        num_workers=8
     )
 
     test_loader = DataLoader(
         test_dataset,
-        batch_size=128,
+        batch_size=64,
         shuffle=False,
-        num_workers=4
+        num_workers=12
     )
 
     model = FileAutoEncoder(
         16,
         [
             [16, 32, 11, 1, 5],
-            [32, 64, 5, 1, 2],
-            [64, 128, 3, 1, 1],
+            [32, 64, 5, 2, 2],
+            [64, 128, 3, 2, 1],
             [128, 256, 3, 2, 1],
-            [256, 512, 3, 2, 1],
-            [512, 512, 3, 2, 1],
+            [256, 256, 3, 2, 1],
+            [256, 256, 3, 2, 1],
+            [256, 256, 3, 2, 1],
         ],
         [
-            [1024, 512, 3, 2, 1, 1],  # kernel=4 для компенсации: (5119-1)*2 + 4 = 10240
-            [1024, 256, 3, 2, 1, 1], 
-            [512, 128, 3, 2, 1, 1], 
-            [256, 64, 3, 1, 1, 0],
-            [128, 32, 5, 1, 2, 0],
-            [64, 16, 11, 1, 5, 0]
+            [256, 256, 3, 2, 1, 1],
+            [256, 256, 3, 2, 1, 1], 
+            [256, 256, 3, 2, 1, 1], 
+            [256, 128, 3, 2, 1, 1], 
+            [128, 64, 3, 2, 1, 1],
+            [64, 32, 5, 2, 2, 1],
+            [32, 16, 11, 1, 5, 0]
         ],
-        ByteLogitsHead(16),
-        is_gelu=True
+        # ByteLogitsHead(16),
+        latent_module=IsCryptH(16384),
+        is_gelu=True,
+        dropout=0.01
     ).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    criterion = AutoEncoderLoss(alpha=1,beta=0.1)
+    criterion = torch.nn.CrossEntropyLoss()
+
+    if len(sys.argv) > 1:
+        load_model_from_checkpoint(load_checkpoint(sys.argv[1]),model,optimizer,device)
+        print('загруженна модель:', sys.argv[1])
 
     best_test_loss = float('inf')
 
+    train_log = {
+        'epoch':[],
+        'train_loss':[],
+        'test_loss': [],
+        'accuracy': []
+    }
+
+
     for epoch in range(NUM_EPOCHES):
+        if msvcrt.kbhit():
+            # Считываем, что именно нажали
+            key = msvcrt.getch().decode('utf-8').lower()
+            if key == 'q':
+                print("\n Выход по нажатию 'q'")
+                break
         train_loss = train_epoch(
             model, optimizer, criterion, train_loader, epoch
         )
@@ -253,6 +277,12 @@ def main():
         test_metrics = test_model(
             model, criterion, test_loader
         )
+
+        train_log['epoch'].append(epoch)
+        train_log['test_loss'].append(train_loss)
+        train_log['train_loss'].append(test_metrics['loss'])
+        train_log['accuracy'].append(test_metrics['unmasked_acc'])
+
 
         print(
             f"Epoch {epoch}: "
@@ -283,9 +313,12 @@ def main():
 
         # Save checkpoint every 5 epochs
         if (epoch + 1) % 5 == 0:
-            save_checkpoint(model, optimizer, epoch, test_metrics, tag=f'FAE')
+            save_checkpoint(model, optimizer, epoch, test_metrics, tag=f'FAE2')
             print(f"  [Saved] Checkpoint at epoch {epoch+1}")
 
+    df = pandas.DataFrame(train_log)
+    df.to_csv('lasted_log.csv', sep=';', encoding='utf-8', index=False, na_rep='NaN')
 
 if __name__ == "__main__":
     main()
+
